@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
-  CreateAccountDTO,
-  UpdateAccountDTO,
-} from "@/lib/types/accounts.types";
+  CreateAccountSchema,
+  UpdateAccountSchema,
+} from "@/lib/validation/accounts.schema";
 
 function createSupabase(req: Request) {
   return createClient(
@@ -20,7 +20,20 @@ function createSupabase(req: Request) {
 }
 
 // CREATE
-export async function createAccount(req: Request, body: CreateAccountDTO) {
+export async function createAccount(req: Request, body: unknown) {
+  const parseResult = CreateAccountSchema.safeParse(body);
+
+  if (!parseResult.success) {
+    return NextResponse.json(
+      {
+        error: "Validation error",
+        details: parseResult.error.flatten(),
+      },
+      { status: 400 }
+    );
+  }
+
+  const data = parseResult.data;
   const supabase = createSupabase(req);
 
   const { data: userData } = await supabase.auth.getUser();
@@ -30,20 +43,13 @@ export async function createAccount(req: Request, body: CreateAccountDTO) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!body.name || !body.type) {
-    return NextResponse.json(
-      { error: "Missing required fields" },
-      { status: 400 }
-    );
-  }
-
-  const { data, error } = await supabase
+  const { data: inserted, error } = await supabase
     .from("accounts")
     .insert({
       user_id: user.id,
-      name: body.name,
-      type: body.type,
-      balance_cents: body.balance_cents ?? 0,
+      name: data.name,
+      type: data.type,
+      balance_cents: data.balance_cents ?? 0,
     })
     .select()
     .single();
@@ -52,7 +58,7 @@ export async function createAccount(req: Request, body: CreateAccountDTO) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json(inserted, { status: 201 });
 }
 
 // LIST
@@ -105,8 +111,21 @@ export async function listAccounts(req: Request) {
 export async function updateAccount(
   req: Request,
   id: string,
-  body: UpdateAccountDTO
+  body: unknown
 ) {
+  const parseResult = UpdateAccountSchema.safeParse(body);
+
+  if (!parseResult.success) {
+    return NextResponse.json(
+      {
+        error: "Validation error",
+        details: parseResult.error.flatten(),
+      },
+      { status: 400 }
+    );
+  }
+
+  const data = parseResult.data;
   const supabase = createSupabase(req);
 
   const { data: userData } = await supabase.auth.getUser();
@@ -116,9 +135,9 @@ export async function updateAccount(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data, error } = await supabase
+  const { data: updated, error } = await supabase
     .from("accounts")
-    .update(body)
+    .update(data)
     .eq("id", id)
     .eq("user_id", user.id)
     .select()
@@ -128,10 +147,10 @@ export async function updateAccount(
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json(updated);
 }
 
-// DELETE (soft delete assumindo active=false)
+// DELETE (soft delete)
 export async function deleteAccount(req: Request, id: string) {
   const supabase = createSupabase(req);
 
