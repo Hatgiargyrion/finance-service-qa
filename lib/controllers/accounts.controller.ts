@@ -4,6 +4,7 @@ import {
   CreateAccountSchema,
   UpdateAccountSchema,
 } from "@/lib/validation/accounts.schema";
+import { apiError } from "@/lib/errors/api-error";
 
 function createSupabase(req: Request) {
   return createClient(
@@ -24,13 +25,12 @@ export async function createAccount(req: Request, body: unknown) {
   const parseResult = CreateAccountSchema.safeParse(body);
 
   if (!parseResult.success) {
-    return NextResponse.json(
-      {
-        error: "Validation error",
-        details: parseResult.error.flatten(),
-      },
-      { status: 400 }
-    );
+    return apiError({
+      code: "VALIDATION_ERROR",
+      message: "Invalid input",
+      details: parseResult.error.flatten(),
+      status: 400,
+    });
   }
 
   const data = parseResult.data;
@@ -40,7 +40,11 @@ export async function createAccount(req: Request, body: unknown) {
   const user = userData.user;
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError({
+      code: "UNAUTHORIZED",
+      message: "Unauthorized",
+      status: 401,
+    });
   }
 
   const { data: inserted, error } = await supabase
@@ -55,7 +59,11 @@ export async function createAccount(req: Request, body: unknown) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return apiError({
+      code: "DATABASE_ERROR",
+      message: error.message,
+      status: 400,
+    });
   }
 
   return NextResponse.json(inserted, { status: 201 });
@@ -77,7 +85,11 @@ export async function listAccounts(req: Request) {
   const user = userData.user;
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError({
+      code: "UNAUTHORIZED",
+      message: "Unauthorized",
+      status: 401,
+    });
   }
 
   let query = supabase
@@ -93,7 +105,11 @@ export async function listAccounts(req: Request) {
   const { data, error, count } = await query;
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return apiError({
+      code: "DATABASE_ERROR",
+      message: error.message,
+      status: 400,
+    });
   }
 
   return NextResponse.json({
@@ -116,13 +132,12 @@ export async function updateAccount(
   const parseResult = UpdateAccountSchema.safeParse(body);
 
   if (!parseResult.success) {
-    return NextResponse.json(
-      {
-        error: "Validation error",
-        details: parseResult.error.flatten(),
-      },
-      { status: 400 }
-    );
+    return apiError({
+      code: "VALIDATION_ERROR",
+      message: "Invalid input",
+      details: parseResult.error.flatten(),
+      status: 400,
+    });
   }
 
   const data = parseResult.data;
@@ -132,7 +147,11 @@ export async function updateAccount(
   const user = userData.user;
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError({
+      code: "UNAUTHORIZED",
+      message: "Unauthorized",
+      status: 401,
+    });
   }
 
   const { data: updated, error } = await supabase
@@ -144,13 +163,17 @@ export async function updateAccount(
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return apiError({
+      code: "DATABASE_ERROR",
+      message: error.message,
+      status: 400,
+    });
   }
 
   return NextResponse.json(updated);
 }
 
-// DELETE (soft delete)
+// DELETE
 export async function deleteAccount(req: Request, id: string) {
   const supabase = createSupabase(req);
 
@@ -158,7 +181,11 @@ export async function deleteAccount(req: Request, id: string) {
   const user = userData.user;
 
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError({
+      code: "UNAUTHORIZED",
+      message: "Unauthorized",
+      status: 401,
+    });
   }
 
   const { error } = await supabase
@@ -168,7 +195,11 @@ export async function deleteAccount(req: Request, id: string) {
     .eq("user_id", user.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return apiError({
+      code: "DATABASE_ERROR",
+      message: error.message,
+      status: 400,
+    });
   }
 
   return NextResponse.json({ message: "Account deleted" });
